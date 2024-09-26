@@ -1,0 +1,5 @@
+fastapi[standard]
+psycopg2
+wheel
+google-analytics-data
+pandas
