@@ -3,3 +3,4 @@ psycopg2
 wheel
 google-analytics-data
 pandas
+python-dotenv

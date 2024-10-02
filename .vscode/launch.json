@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Fastapi",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "fastapi",
+      "args": [
+        "dev", 
+        "main.py",  
+        "--port", 
+        "8001"
+      ]
+    }
+  ]
+}
