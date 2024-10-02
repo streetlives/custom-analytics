@@ -132,6 +132,7 @@ async def analytics_data(geometry_type: GeometryEnum):
                 "features": [ { 
                     "type": "Feature", 
                     "properties": { 
+                        "id": neighborhood,
                         "neighborhood": neighborhood, 
                         "borough": borough,
                     }, 
@@ -143,6 +144,16 @@ async def analytics_data(geometry_type: GeometryEnum):
                 select district_id, ST_AsGeoJSON(geometry)::json from nyc_districts
                 where type = %s 
             ''', (geometry_type.value,))
-            return cur.fetchall()
+            return {
+                "type": "FeatureCollection",
+                "features": [ { 
+                    "type": "Feature", 
+                    "properties": { 
+                        "id": district_id,
+                        "districtId": district_id,
+                    }, 
+                    "geometry": polygon_coordinates
+                } for district_id, polygon_coordinates in cur.fetchall() ]
+            }
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

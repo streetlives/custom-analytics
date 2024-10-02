@@ -2,186 +2,195 @@
 <meta charset="utf-8">
 
 <style>
+  path {
+    stroke: #555;
+    stroke-width: 1;
+  }
 
-path {
-  stroke: #555;
-  stroke-width: 1; 
-}
+  #neighborhoodPopover {
+    position: absolute;
+    text-align: center;
+    padding: 2px;
+    font: 12px sans-serif;
+    background: #fff;
+    border: 0px;
+    border-radius: 8px;
+    pointer-events: none;
+    opacity: 0;
+  }
 
-#neighborhoodPopover { 
-  position: absolute;     
-  text-align: center;         
-  padding: 2px;       
-  font: 12px sans-serif;    
-  background: #fff; 
-  border: 0px;    
-  border-radius: 8px;     
-  pointer-events: none;
-  opacity: 0;     
-}
-
-circle {
-  stroke: black;
-  fill: green;
-  stroke-width: .1;
-}
+  circle {
+    stroke: black;
+    fill: green;
+    stroke-width: .1;
+  }
 </style>
 
 <body></body>
-  <div id="controls" style="position: absolute">
-    <p>
-      Start Date: 
-      <input type="date" id="start-date" value="2024-09-01" onchange="debouncedRender()"/>
-    </p>
-    <p>
-      End Date: 
-      <input type="date" id="end-date" value="2024-09-25" onchange="debouncedRender()"/>
-    </p>
-  </div>
-  <p id="loading" style="text-align: center;">Loading data...</p>
-  <svg id="map" width="960" height="720"></svg>
-  <div id='neighborhoodPopover'> </div>
+<div id="controls" style="position: absolute">
+  <p>
+    Start Date:
+    <input type="date" id="start-date" value="2024-09-01" onchange="debouncedRender()" />
+  </p>
+  <p>
+    End Date:
+    <input type="date" id="end-date" value="2024-09-25" onchange="debouncedRender()" />
+  </p>
+  <p>
+    Map type:
+    <select id="mapType" onchange="debouncedRender()">
+      <option value="community">Community District</option>
+      <option value="school">School District</option>
+      <option value="congressional">Congressional District</option>
+      <option value="neighborhood">Neighborhood</option>
+    </select>
+  </p>
+</div>
+<p id="loading" style="text-align: center;">Loading data...</p>
+<svg id="map" width="960" height="720"></svg>
+<div id='neighborhoodPopover'> </div>
 <script src="https://d3js.org/d3.v4.min.js"></script>
 <script src="https://d3js.org/topojson.v1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/d3-array@3"></script>
 <script src="https://cdn.jsdelivr.net/npm/d3-geo@4"></script>
 <script src="https://cdn.jsdelivr.net/npm/d3-geo-projection@4"></script>
 <script src="node_modules/chroma-js/chroma.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.13.7/underscore-min.js" integrity="sha512-dvWGkLATSdw5qWb2qozZBRKJ80Omy2YN/aF3wTUVC5+D1eqbA+TjWpPpoj8vorK5xGLMa2ZqIeWCpDZP/+pQGQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.13.7/underscore-min.js"
+  integrity="sha512-dvWGkLATSdw5qWb2qozZBRKJ80Omy2YN/aF3wTUVC5+D1eqbA+TjWpPpoj8vorK5xGLMa2ZqIeWCpDZP/+pQGQ=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
 
-let locationsVisible = false;
+  let locationsVisible = false;
 
-var svg = d3.select("svg"),
+  var svg = d3.select("svg"),
     width = +svg.attr("width"),
     height = +svg.attr("height");
 
-function render(){
+  function render() {
 
-  const startDate = document.getElementById('start-date').value;
-  const endDate = document.getElementById('end-date').value;
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
+    const mapType = document.getElementById('mapType').value;
 
-  document.getElementById('loading').style.display = 'block';
-  document.getElementById('map').innerHTML = '';
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('map').innerHTML = '';
 
-  Promise.all([
-    fetch(`/location-analytics?start_date=${startDate}&end_date=${endDate}`).then(response => response.json()),
-    fetch(`/district-neighborhood-analytics?start_date=${startDate}&end_date=${endDate}&geometry_type=neighborhood`).then(response => response.json()),
-    fetch(`/geojson-geometries?geometry_type=neighborhood`).then(response => response.json())
-  ]).then(([locationsData, neighborhoodMap, nyc ]) => {
+    Promise.all([
+      fetch(`/location-analytics?start_date=${startDate}&end_date=${endDate}`).then(response => response.json()),
+      fetch(`/district-neighborhood-analytics?start_date=${startDate}&end_date=${endDate}&geometry_type=${mapType}`).then(response => response.json()),
+      fetch(`/geojson-geometries?geometry_type=${mapType}`).then(response => response.json())
+    ]).then(([locationsData, geometryAnalyticsMap, geometry]) => {
 
-    document.getElementById('loading').style.display = 'none';
+      document.getElementById('loading').style.display = 'none';
 
-    console.log(locationsData, neighborhoodMap, nyc);
+      console.log(locationsData, geometryAnalyticsMap, geometry);
 
-    const projection = 
-            d3.geoConicConformal()
-              .parallels([33, 45])
-              .rotate([96, -39])
-              .fitSize([width, height], nyc);
+      const projection =
+        d3.geoConicConformal()
+          .parallels([33, 45])
+          .rotate([96, -39])
+          .fitSize([width, height], geometry);
 
-    var path = d3.geoPath()
+      var path = d3.geoPath()
         .projection(projection);
 
 
-    const fillScale = chroma.scale(['#ADD8E6', '#FF474C'])
+      const fillScale = chroma.scale(['#ADD8E6', '#FF474C'])
 
-    svg.selectAll("path")
-        .data(nyc.features)
+      svg.selectAll("path")
+        .data(geometry.features)
         .enter().append("path")
         .attr("d", path)
         .attr("fill", feature => {
-          const neighborhoodNameFromFeature = feature.properties.neighborhood;
-          const metadata = neighborhoodMap[neighborhoodNameFromFeature];
-          if(metadata != undefined){
-              const opacity = metadata['percentage'];
-              return fillScale(opacity);
+          const idFromFeature = feature.properties.id;
+          const metadata = geometryAnalyticsMap[idFromFeature];
+          if (metadata != undefined) {
+            const opacity = metadata['percentage'];
+            return fillScale(opacity);
           } else {
-              console.log("Couldn't find this neighborhood", neighborhoodNameFromFeature);
-              return 'white';
+            console.log("Couldn't find this neighborhood", idFromFeature);
+            return 'white';
           }
         })
-        .on("mouseenter", function(feature) {
-          const neighborhoodNameFromFeature = feature.properties.neighborhood;
-          const metadata = neighborhoodMap[neighborhoodNameFromFeature];
-          if(metadata != undefined){
+        .on("mouseenter", function (feature) {
+          const idFromFeature = feature.properties.id;
+          const metadata = geometryAnalyticsMap[idFromFeature];
+          if (metadata != undefined) {
             d3.select(this)
-            .style("stroke", 'yellow')
-            .style("stroke-width", 1.5);
+              .style("stroke", 'yellow')
+              .style("stroke-width", 1.5);
 
             d3.select("#neighborhoodPopover")
-            .transition()
-            .style("opacity", 1)
-            .style("left", (d3.event.pageX) + "px")
-            .style("top", (d3.event.pageY) + "px")
-            .text(`${feature.properties.neighborhood} (${metadata['totalUsers']} total users)`)
+              .transition()
+              .style("opacity", 1)
+              .style("left", (d3.event.pageX) + "px")
+              .style("top", (d3.event.pageY) + "px")
+              .text(`${feature.properties.id} (${metadata['totalUsers']} total users)`)
           } else {
             d3.select("#neighborhoodPopover")
-            .transition()
-            .style("opacity", 1)
-            .style("left", (d3.event.pageX) + "px")
-            .style("top", (d3.event.pageY) + "px")
-            .text(feature.properties.neighborhood)
+              .transition()
+              .style("opacity", 1)
+              .style("left", (d3.event.pageX) + "px")
+              .style("top", (d3.event.pageY) + "px")
+              .text(feature.properties.id)
           }
         })
-        .on("mouseleave", function(d) {
+        .on("mouseleave", function (d) {
           d3.select(this)
-          .style("stroke", '#555')
-          .style("stroke-width", 1);
+            .style("stroke", '#555')
+            .style("stroke-width", 1);
 
           d3.select("#neighborhoodPopover")
-          .transition()
-          .style("opacity", 0);
+            .transition()
+            .style("opacity", 0);
         })
-        .on('click', function(d){
+        .on('click', function (d) {
           locationsVisible = !locationsVisible;
           svg.selectAll("circle")
-            .each(function() {
-                d3.select(this).style("visibility", locationsVisible ? "visible" : "hidden");
+            .each(function () {
+              d3.select(this).style("visibility", locationsVisible ? "visible" : "hidden");
             });
         });
 
-    svg.selectAll("circles.points")
+      svg.selectAll("circles.points")
         .data(Object.values(locationsData))
         .enter()
         .append("circle")
-        .attr("r",1)
-        .attr("transform", function(d) {return "translate(" + projection([d.longitude,d.latitude]) + ")";})
-        .on("mouseenter", function(locationData) {
+        .attr("r", 1)
+        .attr("transform", function (d) { return "translate(" + projection([d.longitude, d.latitude]) + ")"; })
+        .on("mouseenter", function (locationData) {
           // look up total users and organization name for a particular location
           // maybe click through to yourpeer/gogetta? 
           const totalUsersAnalyticsMetadata = locationsData[locationData.slug];
-          if(totalUsersAnalyticsMetadata != undefined){
+          if (totalUsersAnalyticsMetadata != undefined) {
             d3.select(this)
-            .style("fill", 'yellow');
+              .style("fill", 'yellow');
 
             d3.select("#neighborhoodPopover")
-            .transition()
-            .style("opacity", 1)
-            .style("left", (d3.event.pageX) + "px")
-            .style("top", (d3.event.pageY) + "px")
-            .text(`${locationData.organizationName} (${totalUsersAnalyticsMetadata.totalUsers} total users)`)
+              .transition()
+              .style("opacity", 1)
+              .style("left", (d3.event.pageX) + "px")
+              .style("top", (d3.event.pageY) + "px")
+              .text(`${locationData.organizationName} (${totalUsersAnalyticsMetadata.totalUsers} total users)`)
           }
         })
-        .on("mouseleave", function(d) {
+        .on("mouseleave", function (d) {
           d3.select(this)
             .style("fill", 'green');
 
           d3.select("#neighborhoodPopover")
-          .transition()
-          .style("opacity", 0);
+            .transition()
+            .style("opacity", 0);
         });
 
-  })
+    })
 
-}
+  }
 
-const debouncedRender = _.debounce(render, 300);
+  const debouncedRender = _.debounce(render, 300);
 
-render();
+  render();
 
 
 </script>
 </body>
-
-
