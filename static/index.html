@@ -45,6 +45,13 @@
       <option value="neighborhood">Neighborhood</option>
     </select>
   </p>
+  <p>
+    Metric type:
+    <select id="metricType" onchange="debouncedRender()">
+      <option value="totalUsersForPagePath">Total Users for Page Path</option>
+      <option value="geolocation">Custom Geolocation Event</option>
+    </select>
+  </p>
 </div>
 <p id="loading" style="text-align: center;">Loading data...</p>
 <svg id="map" width="960" height="720"></svg>
@@ -71,13 +78,14 @@
     const startDate = document.getElementById('start-date').value;
     const endDate = document.getElementById('end-date').value;
     const mapType = document.getElementById('mapType').value;
+    const metricType = document.getElementById('metricType').value;
 
     document.getElementById('loading').style.display = 'block';
     document.getElementById('map').innerHTML = '';
 
     Promise.all([
-      fetch(`/location-analytics?start_date=${startDate}&end_date=${endDate}`).then(response => response.json()),
-      fetch(`/district-neighborhood-analytics?start_date=${startDate}&end_date=${endDate}&geometry_type=${mapType}`).then(response => response.json()),
+      fetch(`/location-analytics?start_date=${startDate}&end_date=${endDate}&analytics_metric_type=${metricType}`).then(response => response.json()),
+      fetch(`/district-neighborhood-analytics?start_date=${startDate}&end_date=${endDate}&geometry_type=${mapType}&analytics_metric_type=${metricType}`).then(response => response.json()),
       fetch(`/geojson-geometries?geometry_type=${mapType}`).then(response => response.json())
     ]).then(([locationsData, geometryAnalyticsMap, geometry]) => {
 
@@ -125,7 +133,7 @@
               .style("opacity", 1)
               .style("left", (d3.event.pageX) + "px")
               .style("top", (d3.event.pageY) + "px")
-              .text(`${feature.properties.id} (${metadata['totalUsers']} total users)`)
+              .text(`${feature.properties.id} (${metadata['totalUsers']} ${metricType === 'geolocation' ? 'events': 'total users'})`)
           } else {
             d3.select("#neighborhoodPopover")
               .transition()
@@ -171,7 +179,7 @@
               .style("opacity", 1)
               .style("left", (d3.event.pageX) + "px")
               .style("top", (d3.event.pageY) + "px")
-              .text(`${locationData.organizationName} (${totalUsersAnalyticsMetadata.totalUsers} total users)`)
+              .text(`${locationData.organizationName} (${totalUsersAnalyticsMetadata.totalUsers} ${metricType === 'geolocation' ? 'events': 'total users'})`)
           }
         })
         .on("mouseleave", function (d) {

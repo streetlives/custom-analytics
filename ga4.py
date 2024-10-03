@@ -13,7 +13,7 @@ def parse_int(value):
 def parse_str(value):
     return None if value == '(not set)' or value == '' else value
 
-def fetch_ga4_report(start_date: datetime.date, end_date: datetime.date, property_id="403148122"):
+def fetch_total_users_for_page_path(start_date: datetime.date, end_date: datetime.date, property_id="403148122"):
     """Runs a simple report on a Google Analytics 4 property."""
     # TODO(developer): Uncomment this variable and replace with your
     #  Google Analytics 4 property ID before running the sample.
@@ -29,9 +29,6 @@ def fetch_ga4_report(start_date: datetime.date, end_date: datetime.date, propert
             Dimension(name="pagePath"),  # Fetch the pagePath dimension
         ],
         metrics=[
-            Metric(name="activeUsers"),
-            Metric(name="screenPageViews"),
-            Metric(name="sessions"),
             Metric(name="totalUsers"),
         ],
         date_ranges=[DateRange(start_date=str(start_date), end_date=str(end_date))],
@@ -40,10 +37,7 @@ def fetch_ga4_report(start_date: datetime.date, end_date: datetime.date, propert
 
     return [{
         "pagePath": row.dimension_values[0].value,
-        "activeUsers": int(row.metric_values[0].value),
-        "screenPageViews": int(row.metric_values[1].value),
-        "sessions": int(row.metric_values[2].value),
-        "totalUsers": int(row.metric_values[3].value),
+        "totalUsers": int(row.metric_values[0].value),
     } for row in response.rows]
 
 
@@ -79,13 +73,13 @@ def fetch_geolocation_events_from_ga4(start_date: datetime.date, end_date: datet
 
     return [{
         "borough": parse_str(row.dimension_values[0].value),
-        "communityDistrict": parse_int(row.dimension_values[1].value),
-        "congressionalDistrict": parse_int(row.dimension_values[2].value),
+        "community": parse_int(row.dimension_values[1].value),
+        "congressional": parse_int(row.dimension_values[2].value),
         "googleBorough": parse_str(row.dimension_values[3].value),
         "googleNeighborhood": parse_str(row.dimension_values[4].value),
         "neighborhood": parse_str(row.dimension_values[5].value),
         "pathname": parse_str(row.dimension_values[6].value),
-        "schoolDistrict": parse_int(row.dimension_values[7].value),
+        "school": parse_int(row.dimension_values[7].value),
         "zipCode": parse_str(row.dimension_values[8].value),
         "numGeolocationEvents": int(row.metric_values[0].value),
     } for row in response.rows]
