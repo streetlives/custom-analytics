@@ -32,7 +32,7 @@ class AnalyticsMetricEnum(str, Enum):
 
 app = FastAPI()
 
-pattern = re.compile('POINT\((?P<longitude>-?\d+\.\d+) (?P<latitude>-?\d+\.\d+)\)')
+pattern = re.compile(r'POINT\((?P<longitude>-?\d+\.\d+) (?P<latitude>-?\d+\.\d+)\)')
 def parse_position(position_string):
     m = pattern.match(position_string)
     return {
