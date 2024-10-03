@@ -3,7 +3,7 @@ from fastapi import FastAPI
 import datetime
 import psycopg2
 import os
-from ga4 import fetch_ga4_report
+from ga4 import fetch_ga4_report, fetch_geolocation_events_from_ga4
 import pandas as pd
 from json import loads
 import json
