@@ -12,6 +12,7 @@ if 'GCP_CREDENTIALS' in os.environ:
     credentials_json = os.environ.get('GCP_CREDENTIALS')
     with open('credentials.json', 'w') as f:
         f.write(credentials_json)
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'credentials.json'
 
 def parse_int(value):
     return None if value == '(not set)' or value == '' else int(value)
