@@ -8,8 +8,8 @@ from google.analytics.data_v1beta.types import (
 )
 import os
 
-if 'GCP_CREDENTIALS' in os.environ():
-    credentials_json = os.environ().get('GCP_CREDENTIALS')
+if 'GCP_CREDENTIALS' in os.environ:
+    credentials_json = os.environ.get('GCP_CREDENTIALS')
     with open('credentials.json', 'w') as f:
         f.write(credentials_json)
 
