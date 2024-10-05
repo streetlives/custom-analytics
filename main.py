@@ -40,6 +40,41 @@ def parse_position(position_string):
         'longitude': float(m.group('longitude'))
     }
 
+locations_re = re.compile(r'^/locations/(?P<slug>[^/]+)')
+
+@app.get("/sankey")
+async def location_analytics(
+    start_date: datetime.date, 
+    end_date: datetime.date, 
+):
+    ga4_report = fetch_geolocation_events_from_ga4(start_date, end_date)
+    row_by_slug_df = pd.DataFrame([ {'slug': locations_re.match(row['pathname']).group('slug'), **row } for row in ga4_report if locations_re.match(row['pathname']) ])\
+        .set_index('slug')\
+        .add_prefix('geolocation_')
+    slugs = row_by_slug_df.index
+    with conn.cursor() as cur:
+        cur.execute('''
+            select slug, locations_geocoded_metadata.* from locations 
+            inner join locations_geocoded_metadata on locations.id = locations_geocoded_metadata.location_id
+            where slug in %s
+        ''', (tuple(slugs),))
+        location_metadata_by_slug_df = pd.DataFrame([ {
+            'slug': row[0],
+            'location_id': row[1],
+            'neighborhood': row[2],
+            'borough': row[3],
+            'school_district': row[4],
+            'congressional_district': row[5],
+            'community_district': row[6],
+        } for row in cur.fetchall() ])\
+            .set_index('slug')\
+            .add_prefix('location_details_')
+
+        joined_df = row_by_slug_df.join(location_metadata_by_slug_df)
+
+        return json.loads(joined_df.to_json(orient='table')) 
+
+
 
 @app.get("/location-analytics")
 async def location_analytics(start_date: datetime.date, end_date: datetime.date, analytics_metric_type: AnalyticsMetricEnum):
