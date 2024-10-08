@@ -61,7 +61,6 @@
         </p>
       </div>
       <svg id="mapGeolocation" width="480" height="720"></svg>
-      <div id='neighborhoodPopoverGeolocation'> </div>
     </td>
     <td style="width:50%;position:relative">
       <p id="loadingLocationDetails" style="text-align: center;">Loading data...</p>
@@ -80,10 +79,10 @@
         </p>
       </div>
       <svg id="mapLocationDetails" width="480" height="720"></svg>
-      <div id='neighborhoodPopoverLocationDetails'> </div>
     </td>
   </tr>
 </table>
+<div id='neighborhoodPopover'> </div>
 <script src="https://d3js.org/d3.v4.min.js"></script>
 <script src="https://d3js.org/topojson.v1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/d3-array@3"></script>
@@ -178,6 +177,27 @@
             locationDetailsLookup,
           )
         })
+        .on("mouseenter", function (feature) {
+          d3.select(this)
+            .style("stroke", 'yellow')
+            .style("stroke-width", 1.5);
+
+          d3.select("#neighborhoodPopover")
+            .transition()
+            .style("opacity", 1)
+            .style("left", (d3.event.pageX) + "px")
+            .style("top", (d3.event.pageY) + "px")
+            .text(`District: ${feature.properties.id}`)
+        })
+        .on("mouseleave", function (d) {
+          d3.select(this)
+            .style("stroke", '#555')
+            .style("stroke-width", 1);
+
+          d3.select("#neighborhoodPopover")
+            .transition()
+            .style("opacity", 0);
+        })
 
 
       // location details
@@ -229,6 +249,27 @@
             geolocationLookup,
             locationDetailsLookup,
           )
+        })
+        .on("mouseenter", function (feature) {
+          d3.select(this)
+            .style("stroke", 'yellow')
+            .style("stroke-width", 1.5);
+
+          d3.select("#neighborhoodPopover")
+            .transition()
+            .style("opacity", 1)
+            .style("left", (d3.event.pageX) + "px")
+            .style("top", (d3.event.pageY) + "px")
+            .text(`District: ${feature.properties.id}`)
+        })
+        .on("mouseleave", function (d) {
+          d3.select(this)
+            .style("stroke", '#555')
+            .style("stroke-width", 1);
+
+          d3.select("#neighborhoodPopover")
+            .transition()
+            .style("opacity", 0);
         })
   }
 
