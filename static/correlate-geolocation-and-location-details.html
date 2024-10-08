@@ -178,6 +178,16 @@
           )
         })
         .on("mouseenter", function (feature) {
+
+          let numEventsForDistrict;
+          const idFromFeature = feature.properties.id;
+          if(selectedLocationDetailsId){
+            const currentGeolocationLookup = locationDetailsLookup[selectedLocationDetailsId]
+            if(currentGeolocationLookup[idFromFeature]){
+              numEventsForDistrict = currentGeolocationLookup[idFromFeature];
+            }
+          }
+
           d3.select(this)
             .style("stroke", 'yellow')
             .style("stroke-width", 1.5);
@@ -187,7 +197,7 @@
             .style("opacity", 1)
             .style("left", (d3.event.pageX) + "px")
             .style("top", (d3.event.pageY) + "px")
-            .text(`District: ${feature.properties.id}`)
+            .text(`District: ${feature.properties.id} ${numEventsForDistrict ? `(${numEventsForDistrict} events)` : ''}`)
         })
         .on("mouseleave", function (d) {
           d3.select(this)
@@ -251,6 +261,16 @@
           )
         })
         .on("mouseenter", function (feature) {
+
+          let numEventsForDistrict;
+          const idFromFeature = feature.properties.id;
+          if(selectedGeolocationId){
+            const currentLocationDetailsLookup = geolocationLookup[selectedGeolocationId]
+            if(currentLocationDetailsLookup[idFromFeature]){
+              numEventsForDistrict = currentLocationDetailsLookup[idFromFeature];
+            } 
+          } 
+          
           d3.select(this)
             .style("stroke", 'yellow')
             .style("stroke-width", 1.5);
@@ -260,7 +280,7 @@
             .style("opacity", 1)
             .style("left", (d3.event.pageX) + "px")
             .style("top", (d3.event.pageY) + "px")
-            .text(`District: ${feature.properties.id}`)
+            .text(`District: ${feature.properties.id} ${numEventsForDistrict ? `(${numEventsForDistrict} events)` : ''}`)
         })
         .on("mouseleave", function (d) {
           d3.select(this)
