@@ -277,7 +277,7 @@
 
   const debouncedRender = _.debounce(render, 300);
 
-  endDateElement.value = d.toISOString().slice(0,10)
+  endDateElement.value = new Date().toISOString().slice(0,10)
 
   render();
 
