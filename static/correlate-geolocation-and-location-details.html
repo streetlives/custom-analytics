@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<style>
+  path {
+    stroke-width: 1;
+  }
+
+  #neighborhoodPopover {
+    position: absolute;
+    text-align: center;
+    padding: 2px;
+    font: 12px sans-serif;
+    background: #fff;
+    border: 0px;
+    border-radius: 8px;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  circle {
+    stroke: black;
+    fill: green;
+    stroke-width: .1;
+  }
+</style>
+
+<body></body>
+<div id="controls">
+  <p>
+    Start Date:
+    <input type="date" id="start-date" value="2024-09-01" onchange="debouncedRender()" />
+  </p>
+  <p>
+    End Date:
+    <input type="date" id="end-date" value="2024-09-25" onchange="debouncedRender()" />
+  </p>
+  <p>
+    Local Maximum: <span id="localMaximum"></span>
+  </p>
+</div>
+<table style="width:100%; height: 720px;" id="maps">
+  <tr>
+    <td style="width:50%;position:relative">
+      <p id="loadingGeolocation" style="text-align: center;">Loading data...</p>
+      <div>
+        <p>
+          User's location when using the site
+        </p>
+        <p>
+          Map type:
+          <select id="mapTypeGeolocation" onchange="debouncedRender()">
+            <option value="community">Community District</option>
+            <option value="school">School District</option>
+            <option value="congressional">Congressional District</option>
+            <option value="neighborhood">Neighborhood</option>
+          </select>
+        </p>
+      </div>
+      <svg id="mapGeolocation" width="480" height="720"></svg>
+      <div id='neighborhoodPopoverGeolocation'> </div>
+    </td>
+    <td style="width:50%;position:relative">
+      <p id="loadingLocationDetails" style="text-align: center;">Loading data...</p>
+      <div>
+        <p>
+          What the user is looking at
+        </p>
+        <p>
+          Map type:
+          <select id="mapTypeLocationDetails" onchange="debouncedRender()">
+            <option value="community">Community District</option>
+            <option value="school">School District</option>
+            <option value="congressional">Congressional District</option>
+            <option value="neighborhood">Neighborhood</option>
+          </select>
+        </p>
+      </div>
+      <svg id="mapLocationDetails" width="480" height="720"></svg>
+      <div id='neighborhoodPopoverLocationDetails'> </div>
+    </td>
+  </tr>
+</table>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://d3js.org/topojson.v1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-array@3"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-geo@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-geo-projection@4"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.4.2/chroma.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.13.7/underscore-min.js"></script>
+<script>
+
+  let selectedGeolocationId = null;
+  let selectedLocationDetailsId = null;
+
+  const localMaximum = document.getElementById('localMaximum');
+
+  let locationsVisible = false;
+
+  var svgLocationDetails = d3.select("svg#mapLocationDetails"),
+    widthLocationDetails = +svgLocationDetails.attr("width"),
+    heightLocationDetails = +svgLocationDetails.attr("height");
+
+  var svgGeolocation = d3.select("svg#mapGeolocation"),
+    widthGeolocation = +svgGeolocation.attr("width"),
+    heightGeolocation = +svgGeolocation.attr("height");
+
+  const fillScale = chroma.scale(['#ADD8E6', '#FF474C'])
+
+  function doRender(
+    geometryGeolocation, 
+    geometryLocationDetails,
+    geolocationLookup,
+    locationDetailsLookup,
+  ){
+
+    document.getElementById('mapGeolocation').innerHTML = '';
+    document.getElementById('mapLocationDetails').innerHTML = '';
+
+      const locationDetailsMaximum = Math.max(...Object.values(locationDetailsLookup).flatMap(value => Object.values(value)))
+
+      document.getElementById('loadingGeolocation').style.display = 'none';
+      document.getElementById('loadingLocationDetails').style.display = 'none';
+
+      // geolocation
+      const projectionGeolocation =
+        d3.geoConicConformal()
+          .parallels([33, 45])
+          .rotate([96, -39])
+          .fitSize([widthGeolocation, heightGeolocation], geometryGeolocation);
+
+      var pathGeolocation = d3.geoPath()
+        .projection(projectionGeolocation);
+
+      svgGeolocation.selectAll("path")
+        .data(geometryGeolocation.features)
+        .enter().append("path")
+        .attr("d", pathGeolocation)
+        .attr("fill", feature => {
+          const idFromFeature = feature.properties.id;
+          if(selectedLocationDetailsId){
+            const currentGeolocationLookup = locationDetailsLookup[selectedLocationDetailsId]
+            const locationDetailMaximum = Math.max(...Object.values(currentGeolocationLookup))
+            if(currentGeolocationLookup[idFromFeature]){
+              localMaximum.value = locationDetailMaximum;
+              return fillScale(currentGeolocationLookup[idFromFeature] / locationDetailMaximum);
+            } else {
+              return 'white';
+            }
+          } else {
+            return 'white';
+          }
+        })
+        .attr('stroke', function (feature){
+          if(selectedGeolocationId === feature.properties.id){
+            return 'red';
+          } else {
+            return 'black';
+          }
+        })
+        .on("click", function (feature) {
+          selectedGeolocationId = feature.properties.id;
+          selectedLocationDetailsId = null;
+          localMaximum.value = '';
+          doRender(
+            geometryGeolocation, 
+            geometryLocationDetails,
+            geolocationLookup,
+            locationDetailsLookup,
+          )
+        })
+
+
+      // location details
+      const projectionLocationDetails =
+        d3.geoConicConformal()
+          .parallels([33, 45])
+          .rotate([96, -39])
+          .fitSize([widthLocationDetails, heightLocationDetails], geometryLocationDetails);
+
+      var pathLocationDetails = d3.geoPath()
+        .projection(projectionLocationDetails);
+
+      svgLocationDetails.selectAll("path")
+        .data(geometryLocationDetails.features)
+        .enter().append("path")
+        .attr("d", pathLocationDetails)
+        .attr("fill", feature => {
+          const idFromFeature = feature.properties.id;
+          if(selectedGeolocationId){
+            const currentLocationDetailsLookup = geolocationLookup[selectedGeolocationId]
+            const geolocationMaximum = Math.max(...Object.values(currentLocationDetailsLookup))
+            if(currentLocationDetailsLookup[idFromFeature]){
+              localMaximum.value = geolocationMaximum;
+              return fillScale(currentLocationDetailsLookup[idFromFeature] / geolocationMaximum);
+            } else {
+              return 'white';
+            }
+          } else {
+            return 'white';
+          }
+        })
+        .attr('stroke', function (feature){
+          if(selectedLocationDetailsId === feature.properties.id){
+            return 'red';
+          } else {
+            return 'black';
+          }
+        })
+        .on("click", function (feature) {
+          selectedGeolocationId = null;
+          selectedLocationDetailsId = feature.properties.id;
+          localMaximum.value = '';
+          doRender(
+            geometryGeolocation, 
+            geometryLocationDetails,
+            geolocationLookup,
+            locationDetailsLookup,
+          )
+        })
+  }
+
+  function render() {
+
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
+    const mapTypeGeolocation = document.getElementById('mapTypeGeolocation').value;
+    const mapTypeLocationDetails = document.getElementById('mapTypeLocationDetails').value;
+
+    document.getElementById('loadingGeolocation').style.display = 'block';
+    document.getElementById('mapGeolocation').innerHTML = '';
+    document.getElementById('loadingLocationDetails').style.display = 'block';
+    document.getElementById('mapLocationDetails').innerHTML = '';
+
+    Promise.all([
+      fetch(`/sankey?start_date=${startDate}&end_date=${endDate}&geolocation_geometry_type=${mapTypeGeolocation}&location_detail_geometry_type=${mapTypeLocationDetails}`).then(response => response.json()),
+      fetch(`/geojson-geometries?geometry_type=${mapTypeGeolocation}`).then(response => response.json()),
+      fetch(`/geojson-geometries?geometry_type=${mapTypeLocationDetails}`).then(response => response.json())
+    ]).then(([sankeyData, geometryGeolocation, geometryLocationDetails]) => {
+
+      console.log('sankeyData', sankeyData)
+
+      // transform the sankey data structure to something more useful
+      const geolocationLookup = {}
+      const locationDetailsLookup = {}
+      sankeyData.links.map(link => {
+        const geolocationId = parseInt(link.source.split('_').pop())
+        const locationDetailsId = parseInt(link.target.split('_').pop())
+        const value = link.value
+        if(geolocationLookup[geolocationId]){
+          geolocationLookup[geolocationId][locationDetailsId] = value
+        } else {
+          geolocationLookup[geolocationId] = {
+            [locationDetailsId] : value
+          }
+        }
+
+        if(locationDetailsLookup[locationDetailsId]){
+          locationDetailsLookup[locationDetailsId][geolocationId] = value
+        } else {
+          locationDetailsLookup[locationDetailsId] = {
+            [geolocationId] : value
+          }
+        }
+      })
+
+      doRender(
+        geometryGeolocation, 
+        geometryLocationDetails,
+        geolocationLookup, 
+        locationDetailsLookup
+      )
+    })
+  }
+
+  const debouncedRender = _.debounce(render, 300);
+
+  render();
+
+
+</script>
+</body>

@@ -42,6 +42,9 @@ def parse_position(position_string):
 
 locations_re = re.compile(r'^/locations/(?P<slug>[^/]+)')
 
+def format_value(value, geometry_enum: GeometryEnum):
+    return value if geometry_enum.value == 'neighborhood' else int(value)
+
 @app.get("/sankey")
 async def location_analytics(
     start_date: datetime.date, 
@@ -56,7 +59,7 @@ async def location_analytics(
     geolocation_df = pd.DataFrame([
         {
             'slug': locations_re.match(row['pathname']).group('slug'), 
-            f'geolocation_{geolocation_geometry_type.value}': row[geolocation_geometry_type.value],
+            f'geolocation_{geolocation_geometry_type.value}': format_value(row[geolocation_geometry_type.value], geolocation_geometry_type),
             'numGeolocationEvents': geolocation_geometry_type_to_sum.loc[row[geolocation_geometry_type.value]]['numGeolocationEvents'],
         } for _, row in ga4_report_df.iterrows() \
             if locations_re.match(row['pathname']) and \
@@ -88,7 +91,19 @@ async def location_analytics(
             [f'geolocation_{geolocation_geometry_type.value}', f'location_detail_{location_detail_geometry_type.value}']
         ).sum()
 
-        return json.loads(count_joined_df.to_json(orient='table')) 
+        sankey_response = {
+            "nodes": [{"name": name } for name in set(sum([[
+                f'geolocation_{format_value(index[0], geolocation_geometry_type)}', 
+                f'location_detail_{format_value(index[1], geolocation_geometry_type)}',
+            ] for index in count_joined_df.index], []))],
+            "links":[{
+                "source": f'geolocation_{format_value(index[0], geolocation_geometry_type)}',
+                "target": f'location_detail_{format_value(index[1], geolocation_geometry_type)}',
+                "value": int(row['numGeolocationEvents'])
+            } for index, row in count_joined_df.iterrows()]
+        }
+
+        return sankey_response
 
 
 
