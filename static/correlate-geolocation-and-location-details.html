@@ -36,7 +36,10 @@
     <input type="date" id="end-date" value="2024-09-25" onchange="debouncedRender()" />
   </p>
   <p>
-    Local Maximum: <span id="localMaximum"></span>
+    Local Maximum (# of events): <span id="localMaximum"></span>
+  </p>
+  <p>
+    Local Minimum (# of events): <span id="localMinimum"></span>
   </p>
 </div>
 <table style="width:100%; height: 720px;" id="maps">
@@ -94,6 +97,7 @@
   let selectedLocationDetailsId = null;
 
   const localMaximum = document.getElementById('localMaximum');
+  const localMinimum = document.getElementById('localMinimum');
   const startDateElement = document.getElementById('start-date');
   const endDateElement = document.getElementById('end-date');
 
@@ -143,9 +147,11 @@
           if(selectedLocationDetailsId){
             const currentGeolocationLookup = locationDetailsLookup[selectedLocationDetailsId]
             const locationDetailMaximum = Math.max(...Object.values(currentGeolocationLookup))
+            const locationDetailMinimum = Math.min(...Object.values(currentGeolocationLookup))
             if(currentGeolocationLookup[idFromFeature]){
               localMaximum.textContent = locationDetailMaximum;
-              return fillScale(currentGeolocationLookup[idFromFeature] / locationDetailMaximum);
+              localMinimum.textContent = locationDetailMinimum;
+              return fillScale((currentGeolocationLookup[idFromFeature] - locationDetailMinimum) / locationDetailMaximum);
             } else {
               return 'white';
             }
@@ -164,6 +170,7 @@
           selectedGeolocationId = feature.properties.id;
           selectedLocationDetailsId = null;
           localMaximum.textContent = '';
+          localMinimum.textContent = '';
           doRender(
             geometryGeolocation, 
             geometryLocationDetails,
@@ -192,9 +199,11 @@
           if(selectedGeolocationId){
             const currentLocationDetailsLookup = geolocationLookup[selectedGeolocationId]
             const geolocationMaximum = Math.max(...Object.values(currentLocationDetailsLookup))
+            const geolocationMinimum = Math.min(...Object.values(currentLocationDetailsLookup))
             if(currentLocationDetailsLookup[idFromFeature]){
               localMaximum.textContent = geolocationMaximum;
-              return fillScale(currentLocationDetailsLookup[idFromFeature] / geolocationMaximum);
+              localMinimum.textContent = geolocationMinimum;
+              return fillScale((currentLocationDetailsLookup[idFromFeature] - geolocationMinimum) / geolocationMaximum);
             } else {
               return 'white';
             }
@@ -213,6 +222,7 @@
           selectedGeolocationId = null;
           selectedLocationDetailsId = feature.properties.id;
           localMaximum.textContent = '';
+          localMinimum.textContent = '';
           doRender(
             geometryGeolocation, 
             geometryLocationDetails,
