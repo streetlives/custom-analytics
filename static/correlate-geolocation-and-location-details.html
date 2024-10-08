@@ -305,6 +305,9 @@
     document.getElementById('loadingLocationDetails').style.display = 'block';
     document.getElementById('mapLocationDetails').innerHTML = '';
 
+    selectedGeolocationId = null;
+    selectedLocationDetailsId = null;
+
     Promise.all([
       fetch(`/sankey?start_date=${startDate}&end_date=${endDate}&geolocation_geometry_type=${mapTypeGeolocation}&location_detail_geometry_type=${mapTypeLocationDetails}`).then(response => response.json()),
       fetch(`/geojson-geometries?geometry_type=${mapTypeGeolocation}`).then(response => response.json()),
@@ -317,8 +320,8 @@
       const geolocationLookup = {}
       const locationDetailsLookup = {}
       sankeyData.links.map(link => {
-        const geolocationId = parseInt(link.source.split('_').pop())
-        const locationDetailsId = parseInt(link.target.split('_').pop())
+        const geolocationId = link.source.split('_').pop()
+        const locationDetailsId = link.target.split('_').pop()
         const value = link.value
         if(geolocationLookup[geolocationId]){
           geolocationLookup[geolocationId][locationDetailsId] = value
