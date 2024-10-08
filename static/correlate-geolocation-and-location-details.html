@@ -142,7 +142,7 @@
             const currentGeolocationLookup = locationDetailsLookup[selectedLocationDetailsId]
             const locationDetailMaximum = Math.max(...Object.values(currentGeolocationLookup))
             if(currentGeolocationLookup[idFromFeature]){
-              localMaximum.value = locationDetailMaximum;
+              localMaximum.textContent = locationDetailMaximum;
               return fillScale(currentGeolocationLookup[idFromFeature] / locationDetailMaximum);
             } else {
               return 'white';
@@ -161,7 +161,7 @@
         .on("click", function (feature) {
           selectedGeolocationId = feature.properties.id;
           selectedLocationDetailsId = null;
-          localMaximum.value = '';
+          localMaximum.textContent = '';
           doRender(
             geometryGeolocation, 
             geometryLocationDetails,
@@ -191,7 +191,7 @@
             const currentLocationDetailsLookup = geolocationLookup[selectedGeolocationId]
             const geolocationMaximum = Math.max(...Object.values(currentLocationDetailsLookup))
             if(currentLocationDetailsLookup[idFromFeature]){
-              localMaximum.value = geolocationMaximum;
+              localMaximum.textContent = geolocationMaximum;
               return fillScale(currentLocationDetailsLookup[idFromFeature] / geolocationMaximum);
             } else {
               return 'white';
@@ -210,7 +210,7 @@
         .on("click", function (feature) {
           selectedGeolocationId = null;
           selectedLocationDetailsId = feature.properties.id;
-          localMaximum.value = '';
+          localMaximum.textContent = '';
           doRender(
             geometryGeolocation, 
             geometryLocationDetails,
