@@ -94,6 +94,8 @@
   let selectedLocationDetailsId = null;
 
   const localMaximum = document.getElementById('localMaximum');
+  const startDateElement = document.getElementById('start-date');
+  const endDateElement = document.getElementById('end-date');
 
   let locationsVisible = false;
 
@@ -222,8 +224,8 @@
 
   function render() {
 
-    const startDate = document.getElementById('start-date').value;
-    const endDate = document.getElementById('end-date').value;
+    const startDate = startDateElement.value;
+    const endDate = endDateElement.value;
     const mapTypeGeolocation = document.getElementById('mapTypeGeolocation').value;
     const mapTypeLocationDetails = document.getElementById('mapTypeLocationDetails').value;
 
@@ -274,6 +276,8 @@
   }
 
   const debouncedRender = _.debounce(render, 300);
+
+  endDateElement.value = d.toISOString().slice(0,10)
 
   render();
 
