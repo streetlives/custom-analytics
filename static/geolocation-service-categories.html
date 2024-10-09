@@ -62,7 +62,11 @@
 </div>
 <p id="loading" style="text-align: center;">Loading data...</p>
 <svg id="map" width="960" height="720"></svg>
-<div id='neighborhoodPopover'> </div>
+<div id='neighborhoodPopover' style="width:200px"> 
+    <p id="neighborhoodPopoverText"></p>
+    <p id="neighborhoodPopoverPieChart"></p>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/11.4.8/highcharts.js"></script>
 <script src="https://d3js.org/d3.v4.min.js"></script>
 <script src="https://d3js.org/topojson.v1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/d3-array@3"></script>
@@ -126,7 +130,7 @@
           const idFromFeature = feature.properties.id;
           const metadata = geometryAnalyticsMap[idFromFeature];
           if (metadata != undefined) {
-            const category = Object.entries(metadata).map(([k, v]) => [v, k]).sort().pop()[1]
+            const category = Object.entries(metadata).sort(([k1,v1], [k2,v2]) => v2 - v1)[0][0]
             return colorMap[category];
           } else {
             console.log("Couldn't find this neighborhood", idFromFeature);
@@ -146,13 +150,50 @@
               .style("opacity", 1)
               .style("left", (d3.event.pageX) + "px")
               .style("top", (d3.event.pageY) + "px")
-              .text(`District: ${feature.properties.id} (${metadata['totalUsers']} events)`)
+
+            d3.select("#neighborhoodPopoverText")
+              .transition()
+              .text(``)
+
+
+            const entries = Object.entries(metadata)
+            Highcharts.chart('neighborhoodPopoverPieChart', {
+                chart: {
+                    type: 'column'
+                },
+                title: {
+                    text: `District: ${feature.properties.id}`,
+                    align: 'center'
+                },
+                xAxis: {
+                    categories: entries.map(entry => entry[0]),
+                },
+                yAxis: {
+                    min: 0,
+                    title: {
+                        text: '# events'
+                    }
+                },
+                series: [
+                    {
+                        data: entries.map(entry => ({
+                            color: colorMap[entry[0]],
+                            y: entry[1]
+                        })),
+                    },
+                ]
+            });
+
+
           } else {
             d3.select("#neighborhoodPopover")
               .transition()
               .style("opacity", 1)
               .style("left", (d3.event.pageX) + "px")
               .style("top", (d3.event.pageY) + "px")
+
+            d3.select("#neighborhoodPopoverText")
+              .transition()
               .text(feature.properties.id)
           }
         })
