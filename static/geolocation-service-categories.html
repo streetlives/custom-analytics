@@ -108,6 +108,9 @@
       fetch(`/geojson-geometries?geometry_type=${mapType}`).then(response => response.json())
     ]).then(([geometryAnalyticsMap, geometry]) => {
 
+      const maximumEventCountForAllDistricts = Math.max(...Object.values(geometryAnalyticsMap).map(x => Object.values(x).reduce((a, b) => a + b, 0)))   
+      console.log('maximumEventCountForAllDistricts ', maximumEventCountForAllDistricts )
+
       document.getElementById('loading').style.display = 'none';
 
       console.log(geometryAnalyticsMap, geometry);
@@ -131,7 +134,10 @@
           const metadata = geometryAnalyticsMap[idFromFeature];
           if (metadata != undefined) {
             const category = Object.entries(metadata).sort(([k1,v1], [k2,v2]) => v2 - v1)[0][0]
-            return colorMap[category];
+            const opacity = Object.values(metadata).reduce((a, b) => a + b, 0) / maximumEventCountForAllDistricts;
+            const color = d3.color(colorMap[category]);
+            color.opacity = opacity;
+            return color;
           } else {
             console.log("Couldn't find this neighborhood", idFromFeature);
             return 'white';
@@ -194,7 +200,9 @@
 
             d3.select("#neighborhoodPopoverText")
               .transition()
-              .text(feature.properties.id)
+              .text(`District ${feature.properties.id}`)
+
+            document.getElementById("neighborhoodPopoverPieChart").innerHTML = '';
           }
         })
         .on("mouseleave", function (d) {
