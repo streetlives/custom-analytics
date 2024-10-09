@@ -46,6 +46,38 @@ locations_re = re.compile(r'^/locations/(?P<slug>[^/]+)')
 def format_value(value, geometry_enum: GeometryEnum):
     return value if geometry_enum.value == 'neighborhood' else int(value)
 
+category_paths = (
+    '/food',
+    '/shelters-housing',
+    '/clothing',
+    '/personal-care',
+    '/health-care',
+    '/other-services',
+)
+
+@app.get("/geolocation-service-category-analytics")
+async def geolocation_service_category_analytics(
+    start_date: datetime.date, 
+    end_date: datetime.date, 
+    geometry_type: GeometryEnum, 
+):
+    ga4_report_df = pd.DataFrame(fetch_geolocation_events_from_ga4(start_date, end_date))
+    category_df = ga4_report_df[ga4_report_df['pathname'].str.startswith(category_paths)]
+    category_df.insert(0, 'category', category_df['pathname'].map(lambda pathname: pathname.split('/')[1]))
+    filtered_category_df = category_df[~category_df[geometry_type.value].isna()]
+    slice_df = filtered_category_df[['category', geometry_type.value, 'numGeolocationEvents']]
+    sum_df = slice_df.groupby([geometry_type.value,'category']).sum()
+    lookup_map = {}
+    for (district, category,), row in sum_df.iterrows():
+        district = format_value(district, geometry_type)
+        num_geolocation_events = int(row['numGeolocationEvents'])
+        if district in lookup_map:
+            lookup_map[district][category] = num_geolocation_events
+        else:
+            lookup_map[district] = {category: num_geolocation_events}
+    return lookup_map       
+
+
 @app.get("/sankey")
 async def location_analytics(
     start_date: datetime.date, 
