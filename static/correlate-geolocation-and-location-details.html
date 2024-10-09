@@ -119,10 +119,8 @@
     locationDetailsLookup,
   ){
 
-    document.getElementById('mapGeolocation').innerHTML = '';
-    document.getElementById('mapLocationDetails').innerHTML = '';
-
-      const locationDetailsMaximum = Math.max(...Object.values(locationDetailsLookup).flatMap(value => Object.values(value)))
+      document.getElementById('mapGeolocation').innerHTML = '';
+      document.getElementById('mapLocationDetails').innerHTML = '';
 
       document.getElementById('loadingGeolocation').style.display = 'none';
       document.getElementById('loadingLocationDetails').style.display = 'none';
@@ -188,9 +186,7 @@
             }
           }
 
-          d3.select(this)
-            .style("stroke", 'yellow')
-            .style("stroke-width", 1.5);
+          d3.select(this).attr('stroke', 'yellow');
 
           d3.select("#neighborhoodPopover")
             .transition()
@@ -199,10 +195,9 @@
             .style("top", (d3.event.pageY) + "px")
             .text(`District: ${feature.properties.id} ${numEventsForDistrict ? `(${numEventsForDistrict} events)` : ''}`)
         })
-        .on("mouseleave", function (d) {
-          d3.select(this)
-            .style("stroke", '#555')
-            .style("stroke-width", 1);
+        .on("mouseleave", function (feature) {
+
+          d3.select(this).attr('stroke', selectedGeolocationId === feature.properties.id ?  'red': 'black');
 
           d3.select("#neighborhoodPopover")
             .transition()
@@ -271,9 +266,7 @@
             } 
           } 
           
-          d3.select(this)
-            .style("stroke", 'yellow')
-            .style("stroke-width", 1.5);
+          d3.select(this).attr('stroke', 'yellow');
 
           d3.select("#neighborhoodPopover")
             .transition()
@@ -282,10 +275,9 @@
             .style("top", (d3.event.pageY) + "px")
             .text(`District: ${feature.properties.id} ${numEventsForDistrict ? `(${numEventsForDistrict} events)` : ''}`)
         })
-        .on("mouseleave", function (d) {
-          d3.select(this)
-            .style("stroke", '#555')
-            .style("stroke-width", 1);
+        .on("mouseleave", function (feature) {
+
+          d3.select(this).attr('stroke', selectedLocationDetailsId === feature.properties.id ?  'red': 'black');
 
           d3.select("#neighborhoodPopover")
             .transition()
@@ -309,36 +301,10 @@
     selectedLocationDetailsId = null;
 
     Promise.all([
-      fetch(`/sankey?start_date=${startDate}&end_date=${endDate}&geolocation_geometry_type=${mapTypeGeolocation}&location_detail_geometry_type=${mapTypeLocationDetails}`).then(response => response.json()),
+      fetch(`/sankey?start_date=${startDate}&end_date=${endDate}&geolocation_geometry_type=${mapTypeGeolocation}&location_details_geometry_type=${mapTypeLocationDetails}`).then(response => response.json()),
       fetch(`/geojson-geometries?geometry_type=${mapTypeGeolocation}`).then(response => response.json()),
       fetch(`/geojson-geometries?geometry_type=${mapTypeLocationDetails}`).then(response => response.json())
-    ]).then(([sankeyData, geometryGeolocation, geometryLocationDetails]) => {
-
-      console.log('sankeyData', sankeyData)
-
-      // transform the sankey data structure to something more useful
-      const geolocationLookup = {}
-      const locationDetailsLookup = {}
-      sankeyData.links.map(link => {
-        const geolocationId = link.source.split('_').pop()
-        const locationDetailsId = link.target.split('_').pop()
-        const value = link.value
-        if(geolocationLookup[geolocationId]){
-          geolocationLookup[geolocationId][locationDetailsId] = value
-        } else {
-          geolocationLookup[geolocationId] = {
-            [locationDetailsId] : value
-          }
-        }
-
-        if(locationDetailsLookup[locationDetailsId]){
-          locationDetailsLookup[locationDetailsId][geolocationId] = value
-        } else {
-          locationDetailsLookup[locationDetailsId] = {
-            [geolocationId] : value
-          }
-        }
-      })
+    ]).then(([{geolocationLookup, locationDetailsLookup}, geometryGeolocation, geometryLocationDetails]) => {
 
       doRender(
         geometryGeolocation, 

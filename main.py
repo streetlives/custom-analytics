@@ -9,6 +9,7 @@ from json import loads
 import json
 from fastapi.staticfiles import StaticFiles
 import re
+import numpy as np
 
 
 # Connect to your postgres DB
@@ -50,20 +51,17 @@ async def location_analytics(
     start_date: datetime.date, 
     end_date: datetime.date, 
     geolocation_geometry_type: GeometryEnum, 
-    location_detail_geometry_type: GeometryEnum,
+    location_details_geometry_type: GeometryEnum,
 ):
-    ga4_report_df = pd.DataFrame(fetch_geolocation_events_from_ga4(start_date, end_date))
-    geolocation_geometry_type_to_sum = ga4_report_df[[geolocation_geometry_type.value, 'numGeolocationEvents']].\
-        groupby(geolocation_geometry_type.value).sum()
+    ga4_report = fetch_geolocation_events_from_ga4(start_date, end_date)
 
     geolocation_df = pd.DataFrame([
         {
             'slug': locations_re.match(row['pathname']).group('slug'), 
             f'geolocation_{geolocation_geometry_type.value}': format_value(row[geolocation_geometry_type.value], geolocation_geometry_type),
-            'numGeolocationEvents': geolocation_geometry_type_to_sum.loc[row[geolocation_geometry_type.value]]['numGeolocationEvents'],
-        } for _, row in ga4_report_df.iterrows() \
-            if locations_re.match(row['pathname']) and \
-                row[geolocation_geometry_type.value] in geolocation_geometry_type_to_sum.index
+            'numGeolocationEvents': row['numGeolocationEvents']
+        } for row in ga4_report \
+            if locations_re.match(row['pathname']) and row[geolocation_geometry_type.value] is not None
     ]).set_index('slug')
     slugs = geolocation_df.index
     with conn.cursor() as cur:
@@ -83,28 +81,48 @@ async def location_analytics(
         } for row in cur.fetchall() ])\
             .set_index('slug')
 
-        location_metadata_by_slug_df = location_metadata_by_slug_df[[location_detail_geometry_type.value]].\
-            add_prefix(f'location_detail_')
+        location_metadata_by_slug_df = location_metadata_by_slug_df[[location_details_geometry_type.value]].\
+            add_prefix(f'location_details_')
 
         joined_df = geolocation_df.join(location_metadata_by_slug_df)
-        count_joined_df = joined_df.groupby(
-            [f'geolocation_{geolocation_geometry_type.value}', f'location_detail_{location_detail_geometry_type.value}']
-        ).sum()
 
-        sankey_response = {
-            "nodes": [{"name": name } for name in set(sum([[
-                f'geolocation_{format_value(index[0], geolocation_geometry_type)}', 
-                f'location_detail_{format_value(index[1], geolocation_geometry_type)}',
-            ] for index in count_joined_df.index], []))],
-            "links":[{
-                "source": f'geolocation_{format_value(index[0], geolocation_geometry_type)}',
-                "target": f'location_detail_{format_value(index[1], geolocation_geometry_type)}',
-                "value": int(row['numGeolocationEvents'])
-            } for index, row in count_joined_df.iterrows()]
+        geolocation_lookup_map = {}
+        location_details_lookup_map = {}
+
+        filtered_joined_df = joined_df[
+            ~joined_df[f'geolocation_{geolocation_geometry_type.value}'].isna() & \
+                ~joined_df[f'location_details_{location_details_geometry_type.value}'].isna()
+        ]
+        for slug, row in filtered_joined_df.iterrows():
+            geolocation_value = format_value(row[f'geolocation_{geolocation_geometry_type.value}'], geolocation_geometry_type)
+            location_details_value = format_value(row[f'location_details_{location_details_geometry_type.value}'], location_details_geometry_type)
+            event_count = row['numGeolocationEvents']
+
+            # populate geolocation_lookup_map
+            if geolocation_value in geolocation_lookup_map:
+                _location_details_lookup_map = geolocation_lookup_map[geolocation_value]
+                if location_details_value in _location_details_lookup_map:
+                    _location_details_lookup_map[location_details_value] += event_count
+                else:
+                    _location_details_lookup_map[location_details_value] = event_count
+            else:
+                geolocation_lookup_map[geolocation_value] = { location_details_value: event_count }
+
+            # populate location_details_lookup_map
+            if location_details_value in location_details_lookup_map:
+                _geolocation_lookup_map = location_details_lookup_map[location_details_value]
+                if geolocation_value in _geolocation_lookup_map:
+                    _geolocation_lookup_map[geolocation_value] += event_count
+                else:
+                    _geolocation_lookup_map[geolocation_value] = event_count
+            else:    
+                location_details_lookup_map[location_details_value] = { geolocation_value: event_count }
+
+
+        return {
+            'geolocationLookup': geolocation_lookup_map,
+            'locationDetailsLookup': location_details_lookup_map
         }
-
-        return sankey_response
-
 
 
 @app.get("/location-analytics")
