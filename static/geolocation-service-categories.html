@@ -32,7 +32,8 @@
     'clothing': 'blue', 
     'personal-care': 'green', 
     'health': 'orange',
-    'other-services': 'purple'
+    'other-services': 'purple',
+    'unknown': 'gray'
   };
 </script>
 
@@ -136,7 +137,8 @@
             const category = Object.entries(metadata).sort(([k1,v1], [k2,v2]) => v2 - v1)[0][0]
             const opacity = Object.values(metadata).reduce((a, b) => a + b, 0) / maximumEventCountForAllDistricts;
             const color = d3.color(colorMap[category]);
-            color.opacity = opacity;
+            // FIXME: maybe we want to restore opacity
+            //color.opacity = opacity;
             return color;
           } else {
             console.log("Couldn't find this neighborhood", idFromFeature);
