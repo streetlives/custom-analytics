@@ -90,7 +90,7 @@ def fetch_geolocation_events_from_ga4(start_date: datetime.date, end_date: datet
         "pathname": parse_str(row.dimension_values[4].value),
         "school": parse_int(row.dimension_values[5].value),
         "zipCode": parse_str(row.dimension_values[6].value),
-        "numGeolocationEvents": int(row.metric_values[0].value),
+        "numGeolocationEvents": float(row.metric_values[0].value),
         **({"previousParamsRoute": parse_str(row.dimension_values[7].value)} if with_previous_params_route else {})
     } for row in response.rows]
 
