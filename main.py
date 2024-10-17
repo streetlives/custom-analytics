@@ -55,16 +55,68 @@ category_paths = (
     'other-services',
 )
 
-def row_to_category(x):
+database_category_map = {
+    'Food': 'food',
+    'Shelter': 'shelters-housing',
+    'Clothing': 'clothing',
+    'Personal Care': 'personal-care',
+    'Health': 'health-care',
+    'Other service': 'other-services',
+
+}
+
+def fetch_ratio_of_service_categories_for_location(slug):
+    # if it's location details page, then find location from slug
+    # find services at location
+    # find taxonomy of services
+    # find parent taxonomy of services
+    # find percentage of services in parent taxonomy
+    # these are the weights
+    with conn.cursor() as cur:
+        cur.execute('''
+            select case when t.parent_name is not null then t.parent_name else t.name end as service_category, count(1) from 
+            (
+                select * from (
+                    select slug, location_id from location_slug_redirects
+                    union 
+                    select slug, id as location_id from locations
+                ) t
+                where t.slug = %s
+                limit 1
+            ) l
+            inner join service_at_locations sal on sal.location_id = l.location_id
+            inner join service_taxonomy st on st.service_id = sal.service_id
+            inner join taxonomies t on t.id = st.taxonomy_id
+            group by service_category
+        ''', (slug,))
+        rows = cur.fetchall()
+        print(rows)
+        if not rows:
+            return pd.DataFrame()
+        df = pd.DataFrame([{'category': database_category_map[row[0]], 'count': row[1]} for row in rows]).set_index('category')
+        sum = df['count'].sum()
+        df['percentage'] = df['count'] / sum
+        return df['percentage'].to_dict()
+
+def row_to_category_weights(x):
     index, row = x
     pathname = row['pathname']
     previous_params_route = row['previousParamsRoute']
-    first_component = pathname.split('/')[1]
+    path_components = pathname.split('/')
+    first_component = path_components[1]
     if first_component in category_paths:
-        return first_component 
+        return {'index' : index, first_component :  1 }
     elif previous_params_route in category_paths:
-        return previous_params_route 
-    return 'unknown'
+        return {'index' : index, previous_params_route: 1}
+    elif first_component == 'locations' and len(path_components) == 3:
+        # TODO extract the slug
+        slug = path_components[2]
+        return {
+            'index': index,
+            **fetch_ratio_of_service_categories_for_location(slug)
+        }
+
+    return {'index' : index, 'unknown': 1}
 
 
 @app.get("/geolocation-service-category-analytics")
@@ -74,18 +126,27 @@ async def geolocation_service_category_analytics(
     geometry_type: GeometryEnum, 
 ):
     category_df = pd.DataFrame(fetch_geolocation_events_from_ga4(start_date, end_date, with_previous_params_route=True))
-    category_df.insert(0, 'category', list(map(row_to_category, category_df.iterrows())))
-    filtered_category_df = category_df[~category_df[geometry_type.value].isna()]
-    slice_df = filtered_category_df[['category', geometry_type.value, 'numGeolocationEvents']]
-    sum_df = slice_df.groupby([geometry_type.value,'category']).sum()
+    # TODO: optimize the lookup
+    category_weights_df = pd.DataFrame(list(map(row_to_category_weights, category_df.iterrows()))).set_index('index')
     lookup_map = {}
-    for (district, category,), row in sum_df.iterrows():
+    for index, row in category_df.iterrows():
+        district = row[geometry_type.value]
+        if pd.isna(district):
+            continue
         district = format_value(district, geometry_type)
         num_geolocation_events = int(row['numGeolocationEvents'])
+        category_weights = category_weights_df.loc[index].to_dict()
         if district in lookup_map:
+            for category, weight in category_weights.items():
+                    if not pd.isna(weight):
+                        if category in lookup_map[district]:
+                            lookup_map[district][category] += weight * num_geolocation_events 
+                        else:
+                            lookup_map[district][category] = weight * num_geolocation_events 
+
             lookup_map[district][category] = num_geolocation_events
         else:
-            lookup_map[district] = {category: num_geolocation_events}
+            lookup_map[district] = { category: weight * num_geolocation_events for category, weight in category_weights.items() if not pd.isna(weight)}
     return lookup_map       
 
 
