@@ -55,14 +55,26 @@ category_paths = (
     'other-services',
 )
 
+def row_to_category(x):
+    index, row = x
+    pathname = row['pathname']
+    previous_params_route = row['previousParamsRoute']
+    first_component = pathname.split('/')[1]
+    if first_component in category_paths:
+        return first_component 
+    elif previous_params_route in category_paths:
+        return previous_params_route 
+    return 'unknown'
+
+
 @app.get("/geolocation-service-category-analytics")
 async def geolocation_service_category_analytics(
     start_date: datetime.date, 
     end_date: datetime.date, 
     geometry_type: GeometryEnum, 
 ):
-    category_df = pd.DataFrame(fetch_geolocation_events_from_ga4(start_date, end_date))
-    category_df.insert(0, 'category', category_df['pathname'].map(lambda pathname: pathname.split('/')[1] if pathname.split('/')[1] in category_paths else 'unknown'))
+    category_df = pd.DataFrame(fetch_geolocation_events_from_ga4(start_date, end_date, with_previous_params_route=True))
+    category_df.insert(0, 'category', list(map(row_to_category, category_df.iterrows())))
     filtered_category_df = category_df[~category_df[geometry_type.value].isna()]
     slice_df = filtered_category_df[['category', geometry_type.value, 'numGeolocationEvents']]
     sum_df = slice_df.groupby([geometry_type.value,'category']).sum()
