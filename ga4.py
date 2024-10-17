@@ -48,7 +48,7 @@ def fetch_total_users_for_page_path(start_date: datetime.date, end_date: datetim
     } for row in response.rows]
 
 
-def fetch_geolocation_events_from_ga4(start_date: datetime.date, end_date: datetime.date, property_id="403148122"):
+def fetch_geolocation_events_from_ga4(start_date: datetime.date, end_date: datetime.date, property_id="403148122", with_previous_params_route=False):
     """Runs a simple report on a Google Analytics 4 property."""
     # TODO(developer): Uncomment this variable and replace with your
     #  Google Analytics 4 property ID before running the sample.
@@ -64,13 +64,15 @@ def fetch_geolocation_events_from_ga4(start_date: datetime.date, end_date: datet
             Dimension(name="customEvent:borough"),
             Dimension(name="customEvent:communityDistrict"), 
             Dimension(name="customEvent:congressionalDistrict"),
-            Dimension(name="customEvent:googleBorough"),
-            Dimension(name="customEvent:googleNeighborhood"),
+            #Dimension(name="customEvent:googleBorough"),
+            #Dimension(name="customEvent:googleNeighborhood"),
             Dimension(name="customEvent:neighborhood"),
             Dimension(name="customEvent:pathname"),
             Dimension(name="customEvent:schoolDistrict"),
             Dimension(name="customEvent:zipCode"),
-        ],
+        ] + ([
+            Dimension(name="customEvent:previousParamsRoute"),
+        ] if with_previous_params_route else []),
         metrics=[
             Metric(name="keyEvents:geolocation"),
         ],
@@ -82,13 +84,14 @@ def fetch_geolocation_events_from_ga4(start_date: datetime.date, end_date: datet
         "borough": parse_str(row.dimension_values[0].value),
         "community": parse_int(row.dimension_values[1].value),
         "congressional": parse_int(row.dimension_values[2].value),
-        "googleBorough": parse_str(row.dimension_values[3].value),
-        "googleNeighborhood": parse_str(row.dimension_values[4].value),
-        "neighborhood": parse_str(row.dimension_values[5].value),
-        "pathname": parse_str(row.dimension_values[6].value),
-        "school": parse_int(row.dimension_values[7].value),
-        "zipCode": parse_str(row.dimension_values[8].value),
+        #"googleBorough": parse_str(row.dimension_values[3].value),
+        #"googleNeighborhood": parse_str(row.dimension_values[4].value),
+        "neighborhood": parse_str(row.dimension_values[3].value),
+        "pathname": parse_str(row.dimension_values[4].value),
+        "school": parse_int(row.dimension_values[5].value),
+        "zipCode": parse_str(row.dimension_values[6].value),
         "numGeolocationEvents": int(row.metric_values[0].value),
+        **({"previousParamsRoute": parse_str(row.dimension_values[7].value)} if with_previous_params_route else {})
     } for row in response.rows]
 
 if __name__ == '__main__':

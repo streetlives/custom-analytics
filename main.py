@@ -10,6 +10,7 @@ import json
 from fastapi.staticfiles import StaticFiles
 import re
 import numpy as np
+from functools import partial
 
 
 # Connect to your postgres DB
@@ -55,25 +56,108 @@ category_paths = (
     'other-services',
 )
 
+database_category_map = {
+    'Food': 'food',
+    'Shelter': 'shelters-housing',
+    'Clothing': 'clothing',
+    'Personal Care': 'personal-care',
+    'Health': 'health-care',
+    'Other service': 'other-services',
+
+}
+
+def fetch_ratio_of_service_categories_for_locations():
+    # if it's location details page, then find location from slug
+    # find services at location
+    # find taxonomy of services
+    # find parent taxonomy of services
+    # find percentage of services in parent taxonomy
+    # these are the weights
+    with conn.cursor() as cur:
+        cur.execute('''
+            select slug, case when t.parent_name is not null then t.parent_name else t.name end as service_category, count(1) from 
+            (
+                select slug, location_id from location_slug_redirects
+                union 
+                select slug, id as location_id from locations
+            ) l
+            inner join service_at_locations sal on sal.location_id = l.location_id
+            inner join service_taxonomy st on st.service_id = sal.service_id
+            inner join taxonomies t on t.id = st.taxonomy_id
+            group by slug, service_category
+            order by slug
+        ''')
+        rows = cur.fetchall()
+        if not rows:
+            return pd.DataFrame()
+        df = pd.DataFrame([{'slug': row[0], 'category': database_category_map[row[1]], 'count': row[2]} for row in rows])
+        count_by_slug = df.groupby('slug').sum()
+        indexed_df = df.set_index(['slug'])
+        for slug, row in indexed_df.iterrows():
+            count = row['count']
+            total_count = count_by_slug.loc[slug]['count']
+            indexed_df.loc[slug, 'percentage'] = count / total_count
+        return indexed_df
+
+
+def row_to_category_weights(count_of_service_categories_df, x):
+    index, row = x
+    pathname = row['pathname']
+    previous_params_route = row['previousParamsRoute']
+    path_components = pathname.split('/')
+    first_component = path_components[1]
+    if first_component in category_paths:
+        return {'index' : index, first_component :  1 }
+    elif previous_params_route in category_paths:
+        return {'index' : index, previous_params_route: 1}
+    elif first_component == 'locations' and len(path_components) == 3:
+        # TODO extract the slug
+        slug = path_components[2]
+        row = count_of_service_categories_df[count_of_service_categories_df.index == slug][['category', 'percentage']].set_index('category')['percentage'].to_dict()
+        return {
+            'index': index,
+            **row
+        }
+
+    return {'index' : index, 'unknown': 1}
+
+
 @app.get("/geolocation-service-category-analytics")
 async def geolocation_service_category_analytics(
     start_date: datetime.date, 
     end_date: datetime.date, 
     geometry_type: GeometryEnum, 
 ):
-    category_df = pd.DataFrame(fetch_geolocation_events_from_ga4(start_date, end_date))
-    category_df.insert(0, 'category', category_df['pathname'].map(lambda pathname: pathname.split('/')[1] if pathname.split('/')[1] in category_paths else 'unknown'))
-    filtered_category_df = category_df[~category_df[geometry_type.value].isna()]
-    slice_df = filtered_category_df[['category', geometry_type.value, 'numGeolocationEvents']]
-    sum_df = slice_df.groupby([geometry_type.value,'category']).sum()
+    count_of_service_categories_df = fetch_ratio_of_service_categories_for_locations()
+    category_df = pd.DataFrame(fetch_geolocation_events_from_ga4(start_date, end_date, with_previous_params_route=True))
+    # TODO: optimize the lookup
+    category_weights_df = pd.DataFrame(
+        list(
+            map(
+                partial(row_to_category_weights, count_of_service_categories_df), 
+                category_df.iterrows()
+            )
+        )
+    ).set_index('index')
     lookup_map = {}
-    for (district, category,), row in sum_df.iterrows():
+    for index, row in category_df.iterrows():
+        district = row[geometry_type.value]
+        if pd.isna(district):
+            continue
         district = format_value(district, geometry_type)
         num_geolocation_events = int(row['numGeolocationEvents'])
+        category_weights = category_weights_df.loc[index].to_dict()
         if district in lookup_map:
+            for category, weight in category_weights.items():
+                    if not pd.isna(weight):
+                        if category in lookup_map[district]:
+                            lookup_map[district][category] += weight * num_geolocation_events 
+                        else:
+                            lookup_map[district][category] = weight * num_geolocation_events 
+
             lookup_map[district][category] = num_geolocation_events
         else:
-            lookup_map[district] = {category: num_geolocation_events}
+            lookup_map[district] = { category: weight * num_geolocation_events for category, weight in category_weights.items() if not pd.isna(weight)}
     return lookup_map       
 
 
