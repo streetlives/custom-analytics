@@ -10,6 +10,7 @@ import json
 from fastapi.staticfiles import StaticFiles
 import re
 import numpy as np
+from functools import partial
 
 
 # Connect to your postgres DB
@@ -65,7 +66,7 @@ database_category_map = {
 
 }
 
-def fetch_ratio_of_service_categories_for_location(slug):
+def fetch_ratio_of_service_categories_for_locations():
     # if it's location details page, then find location from slug
     # find services at location
     # find taxonomy of services
@@ -74,31 +75,32 @@ def fetch_ratio_of_service_categories_for_location(slug):
     # these are the weights
     with conn.cursor() as cur:
         cur.execute('''
-            select case when t.parent_name is not null then t.parent_name else t.name end as service_category, count(1) from 
+            select slug, case when t.parent_name is not null then t.parent_name else t.name end as service_category, count(1) from 
             (
-                select * from (
-                    select slug, location_id from location_slug_redirects
-                    union 
-                    select slug, id as location_id from locations
-                ) t
-                where t.slug = %s
-                limit 1
+                select slug, location_id from location_slug_redirects
+                union 
+                select slug, id as location_id from locations
             ) l
             inner join service_at_locations sal on sal.location_id = l.location_id
             inner join service_taxonomy st on st.service_id = sal.service_id
             inner join taxonomies t on t.id = st.taxonomy_id
-            group by service_category
-        ''', (slug,))
+            group by slug, service_category
+            order by slug
+        ''')
         rows = cur.fetchall()
-        print(rows)
         if not rows:
             return pd.DataFrame()
-        df = pd.DataFrame([{'category': database_category_map[row[0]], 'count': row[1]} for row in rows]).set_index('category')
-        sum = df['count'].sum()
-        df['percentage'] = df['count'] / sum
-        return df['percentage'].to_dict()
+        df = pd.DataFrame([{'slug': row[0], 'category': database_category_map[row[1]], 'count': row[2]} for row in rows])
+        count_by_slug = df.groupby('slug').sum()
+        indexed_df = df.set_index(['slug'])
+        for slug, row in indexed_df.iterrows():
+            count = row['count']
+            total_count = count_by_slug.loc[slug]['count']
+            indexed_df.loc[slug, 'percentage'] = count / total_count
+        return indexed_df
 
-def row_to_category_weights(x):
+
+def row_to_category_weights(count_of_service_categories_df, x):
     index, row = x
     pathname = row['pathname']
     previous_params_route = row['previousParamsRoute']
@@ -111,9 +113,10 @@ def row_to_category_weights(x):
     elif first_component == 'locations' and len(path_components) == 3:
         # TODO extract the slug
         slug = path_components[2]
+        row = count_of_service_categories_df[count_of_service_categories_df.index == slug][['category', 'percentage']].set_index('category')['percentage'].to_dict()
         return {
             'index': index,
-            **fetch_ratio_of_service_categories_for_location(slug)
+            **row
         }
 
     return {'index' : index, 'unknown': 1}
@@ -125,9 +128,17 @@ async def geolocation_service_category_analytics(
     end_date: datetime.date, 
     geometry_type: GeometryEnum, 
 ):
+    count_of_service_categories_df = fetch_ratio_of_service_categories_for_locations()
     category_df = pd.DataFrame(fetch_geolocation_events_from_ga4(start_date, end_date, with_previous_params_route=True))
     # TODO: optimize the lookup
-    category_weights_df = pd.DataFrame(list(map(row_to_category_weights, category_df.iterrows()))).set_index('index')
+    category_weights_df = pd.DataFrame(
+        list(
+            map(
+                partial(row_to_category_weights, count_of_service_categories_df), 
+                category_df.iterrows()
+            )
+        )
+    ).set_index('index')
     lookup_map = {}
     for index, row in category_df.iterrows():
         district = row[geometry_type.value]
