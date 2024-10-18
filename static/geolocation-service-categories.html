@@ -8,7 +8,6 @@
   }
 
   #neighborhoodPopover {
-    position: absolute;
     text-align: center;
     padding: 2px;
     font: 12px sans-serif;
@@ -16,7 +15,6 @@
     border: 0px;
     border-radius: 8px;
     pointer-events: none;
-    opacity: 0;
   }
 
   circle {
@@ -32,7 +30,7 @@
     'clothing': '#59B2D1', 
     'personal-care': '#009b8a', 
     'health': '#f79862',
-    'other-services': '#702b9d',
+    'other-services': '#ab82c5',
     'unknown': '#b8b8b8'
   };
 </script>
@@ -60,13 +58,13 @@
     Map Legend:
     <ul id="legend" style="background-color: #333;"></ul>
   </p>
+  <div id="neighborhoodPopover" style="width:300px; height:400px;"> 
+      <p id="neighborhoodPopoverText"></p>
+      <p id="neighborhoodPopoverPieChart"></p>
+  </div>
 </div>
 <p id="loading" style="text-align: center;">Loading data...</p>
-<svg id="map" width="960" height="720"></svg>
-<div id='neighborhoodPopover' style="width:300px"> 
-    <p id="neighborhoodPopoverText"></p>
-    <p id="neighborhoodPopoverPieChart"></p>
-</div>
+<svg id="map" width="960" height="720" style="padding-left:10em"></svg>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/11.4.8/highcharts.js"></script>
 <script src="https://d3js.org/d3.v4.min.js"></script>
 <script src="https://d3js.org/topojson.v1.min.js"></script>
@@ -155,9 +153,6 @@
 
             d3.select("#neighborhoodPopover")
               .transition()
-              .style("opacity", 1)
-              .style("left", (d3.event.pageX) + "px")
-              .style("top", (d3.event.pageY) + "px")
 
             d3.select("#neighborhoodPopoverText")
               .transition()
@@ -196,9 +191,6 @@
           } else {
             d3.select("#neighborhoodPopover")
               .transition()
-              .style("opacity", 1)
-              .style("left", (d3.event.pageX) + "px")
-              .style("top", (d3.event.pageY) + "px")
 
             d3.select("#neighborhoodPopoverText")
               .transition()
@@ -214,7 +206,6 @@
 
           d3.select("#neighborhoodPopover")
             .transition()
-            .style("opacity", 0);
         })
 
     })
