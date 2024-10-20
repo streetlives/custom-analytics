@@ -20,7 +20,7 @@ def parse_int(value):
 def parse_str(value):
     return None if value == '(not set)' or value == '' else value
 
-def fetch_total_users_for_page_path(start_date: datetime.date, end_date: datetime.date, property_id="403148122"):
+def fetch_total_users_for_page_path(start_date: datetime.date, end_date: datetime.date, property_id="403148122", dimension="pagePath"):
     """Runs a simple report on a Google Analytics 4 property."""
     # TODO(developer): Uncomment this variable and replace with your
     #  Google Analytics 4 property ID before running the sample.
@@ -33,7 +33,7 @@ def fetch_total_users_for_page_path(start_date: datetime.date, end_date: datetim
     request = RunReportRequest(
         property=f"properties/{property_id}",
         dimensions=[
-            Dimension(name="pagePath"),  # Fetch the pagePath dimension
+            Dimension(name=dimension),  # Fetch the pagePath dimension
         ],
         metrics=[
             Metric(name="totalUsers"),
@@ -43,7 +43,7 @@ def fetch_total_users_for_page_path(start_date: datetime.date, end_date: datetim
     response = client.run_report(request)
 
     return [{
-        "pagePath": row.dimension_values[0].value,
+        dimension: row.dimension_values[0].value,
         "totalUsers": int(row.metric_values[0].value),
     } for row in response.rows]
 

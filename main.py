@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 import re
 import numpy as np
 from functools import partial
+from urllib.parse import urlparse, parse_qs
 
 
 # Connect to your postgres DB
@@ -139,6 +140,7 @@ async def geolocation_service_category_analytics(
             )
         )
     ).set_index('index')
+    category_df.join(category_weights_df).to_csv('category_weights_df.csv')
     lookup_map = {}
     for index, row in category_df.iterrows():
         district = row[geometry_type.value]
@@ -379,5 +381,22 @@ async def analytics_data(geometry_type: GeometryEnum):
                     "geometry": polygon_coordinates
                 } for district_id, polygon_coordinates in cur.fetchall() ]
             }
+
+@app.get("/search-terms")
+async def search_terms(start_date: datetime.date, end_date: datetime.date):
+    ga4_report = fetch_total_users_for_page_path(start_date, end_date, dimension="pagePathPlusQueryString")
+    results = {}
+    for row in ga4_report:
+        total_users = int(row['totalUsers'])
+        parsed_url = urlparse(row["pagePathPlusQueryString"])
+        if parsed_url.query:
+            parsed_query = parse_qs(parsed_url.query)
+            if 'search' in parsed_query:
+                search_text = parsed_query['search'][0]
+                if search_text in results:
+                    results[search_text] += total_users
+                else:
+                    results[search_text] = total_users
+    return results
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

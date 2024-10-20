@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<body>
+<div id="controls">
+  <p>
+    Start Date:
+    <input type="date" id="start-date" value="2024-09-01" onchange="debouncedRender()" />
+  </p>
+  <p>
+    End Date:
+    <input type="date" id="end-date" value="2024-09-25" onchange="debouncedRender()" />
+  </p>
+</div>
+<p id="loading" style="text-align: center;">Loading data...</p>
+<table id="search-term-results"></table>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.13.7/underscore-min.js"
+  integrity="sha512-dvWGkLATSdw5qWb2qozZBRKJ80Omy2YN/aF3wTUVC5+D1eqbA+TjWpPpoj8vorK5xGLMa2ZqIeWCpDZP/+pQGQ=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+
+  const endDateElement = document.getElementById('end-date');
+  const searchTermResults = document.getElementById('search-term-results');
+
+  function render() {
+
+    const startDate = document.getElementById('start-date').value;
+    const endDate = endDateElement.value;
+
+    document.getElementById('loading').style.display = 'block';
+    searchTermResults.innerHTML = '';
+
+    fetch(`/search-terms?start_date=${startDate}&end_date=${endDate}`).then(response => response.json())
+    .then(searchTerms => {
+
+      document.getElementById('loading').style.display = 'none';
+
+      searchTermResults.innerHTML = Object.entries(searchTerms).sort((a, b) => b[1] - a[1]).map(([searchTerm, totalUserCount]) => `<tr><td>${searchTerm}</td><td>${totalUserCount}</td></tr>`).join('')
+    })
+
+  }
+
+  const debouncedRender = _.debounce(render, 300);
+
+  endDateElement.value = new Date().toISOString().slice(0,10)
+
+  render();
+
+
+</script>
+</body>
