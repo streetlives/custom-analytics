@@ -1,5 +1,7 @@
+import secrets
 from enum import Enum
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import datetime
 import psycopg2
 import os
@@ -12,7 +14,10 @@ import re
 import numpy as np
 from functools import partial
 from urllib.parse import urlparse, parse_qs
+from typing import Annotated
 
+
+security = HTTPBasic()
 
 # Connect to your postgres DB
 conn = psycopg2.connect(
@@ -123,11 +128,34 @@ def row_to_category_weights(count_of_service_categories_df, x):
     return {'index' : index, 'unknown': 1}
 
 
+def get_current_username(
+    credentials: Annotated[HTTPBasicCredentials, Depends(security)],
+):
+    current_username_bytes = credentials.username.encode("utf8")
+    correct_username_bytes = os.environ.get('API_USERNAME').encode("utf8")
+    is_correct_username = secrets.compare_digest(
+        current_username_bytes, correct_username_bytes
+    )
+    current_password_bytes = credentials.password.encode("utf8")
+    correct_password_bytes = os.environ.get('API_PASSWORD').encode("utf8")
+    is_correct_password = secrets.compare_digest(
+        current_password_bytes, correct_password_bytes
+    )
+    if not (is_correct_username and is_correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
+
 @app.get("/geolocation-service-category-analytics")
 async def geolocation_service_category_analytics(
     start_date: datetime.date, 
     end_date: datetime.date, 
     geometry_type: GeometryEnum, 
+    username: Annotated[str, Depends(get_current_username)],
 ):
     count_of_service_categories_df = fetch_ratio_of_service_categories_for_locations()
     category_df = pd.DataFrame(fetch_geolocation_events_from_ga4(start_date, end_date, with_previous_params_route=True))
@@ -169,6 +197,7 @@ async def location_analytics(
     end_date: datetime.date, 
     geolocation_geometry_type: GeometryEnum, 
     location_details_geometry_type: GeometryEnum,
+    username: Annotated[str, Depends(get_current_username)],
 ):
     ga4_report = fetch_geolocation_events_from_ga4(start_date, end_date)
 
@@ -243,7 +272,12 @@ async def location_analytics(
 
 
 @app.get("/location-analytics")
-async def location_analytics(start_date: datetime.date, end_date: datetime.date, analytics_metric_type: AnalyticsMetricEnum):
+async def location_analytics(
+    start_date: datetime.date, 
+    end_date: datetime.date, 
+    analytics_metric_type: AnalyticsMetricEnum,
+    username: Annotated[str, Depends(get_current_username)],
+):
     if analytics_metric_type == AnalyticsMetricEnum.geolocation:
         ga4_report = fetch_geolocation_events_from_ga4(start_date, end_date)
         page_path_key = 'pathname'
@@ -282,7 +316,13 @@ async def location_analytics(start_date: datetime.date, end_date: datetime.date,
 
 
 @app.get("/district-neighborhood-analytics")
-async def analytics_data(start_date: datetime.date, end_date: datetime.date, geometry_type: GeometryEnum, analytics_metric_type: AnalyticsMetricEnum):
+async def analytics_data(
+    start_date: datetime.date, 
+    end_date: datetime.date, 
+    geometry_type: GeometryEnum, 
+    analytics_metric_type: AnalyticsMetricEnum,
+    username: Annotated[str, Depends(get_current_username)],
+):
     if analytics_metric_type == AnalyticsMetricEnum.geolocation:
         # in this case, we don't need to join anything to the database, because the geo information is already embedded in the GA4 event
         ga4_report = fetch_geolocation_events_from_ga4(start_date, end_date)
@@ -347,7 +387,10 @@ async def analytics_data(start_date: datetime.date, end_date: datetime.date, geo
                 }
 
 @app.get("/geojson-geometries")
-async def analytics_data(geometry_type: GeometryEnum):
+async def analytics_data(
+    geometry_type: GeometryEnum,
+    username: Annotated[str, Depends(get_current_username)],
+):
     with conn.cursor() as cur:
         if geometry_type == GeometryEnum.neighborhood:
             cur.execute('''
@@ -383,7 +426,11 @@ async def analytics_data(geometry_type: GeometryEnum):
             }
 
 @app.get("/search-terms")
-async def search_terms(start_date: datetime.date, end_date: datetime.date):
+async def search_terms(
+    start_date: datetime.date, 
+    end_date: datetime.date,
+    username: Annotated[str, Depends(get_current_username)],
+):
     ga4_report = fetch_total_users_for_page_path(start_date, end_date, dimension="pagePathPlusQueryString")
     results = {}
     for row in ga4_report:
