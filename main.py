@@ -33,6 +33,7 @@ class GeometryEnum(str, Enum):
     congressional = "congressional"
     school = "school"
     neighborhood = "neighborhood"
+    city_council = 'city-council'
 
 class AnalyticsMetricEnum(str, Enum):
     geolocation = "geolocation"
