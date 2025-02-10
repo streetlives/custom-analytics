@@ -213,6 +213,8 @@ async def location_analytics(
 ):
     ga4_report = fetch_geolocation_events_from_ga4(start_date, end_date)
 
+    print('ga4_report', ga4_report)
+
     geolocation_df = pd.DataFrame([
         {
             'slug': locations_re.match(row['pathname']).group('slug'), 
@@ -220,7 +222,13 @@ async def location_analytics(
             'numGeolocationEvents': row['numGeolocationEvents']
         } for row in ga4_report \
             if locations_re.match(row['pathname']) and row[geolocation_geometry_type.value] is not None
-    ]).set_index('slug')
+    ])
+    if geolocation_df.empty:
+        return {
+            'geolocationLookup': {},
+            'locationDetailsLookup': {}
+        }
+    geolocation_df = geolocation_df.set_index('slug')
     slugs = geolocation_df.index
     with conn.cursor() as cur:
         cur.execute('''
