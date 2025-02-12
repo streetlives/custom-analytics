@@ -33,6 +33,18 @@ class GeometryEnum(str, Enum):
     congressional = "congressional"
     school = "school"
     neighborhood = "neighborhood"
+    state_assembly_district = 'state_assembly_district'
+    state_assembly_district_water_areas = 'state_assembly_district_water_areas'
+    us_congressional_district = 'us_congressional_district'
+    us_congressional_district_water_areas = 'us_congressional_district_water_areas'
+    state_senate_district = 'state_senate_district'
+    state_senate_district_water_areas = 'state_senate_district_water_areas'
+    municipal_court_district = 'municipal_court_district'
+    municipal_court_district_water_areas = 'municipal_court_district_water_areas'
+    city_council_district = 'city_council_district'
+    city_council_district_water_areas = 'city_council_district_water_areas'
+    election_district = 'election_district'
+    election_district_water_areas = 'election_district_water_areas'
 
 class AnalyticsMetricEnum(str, Enum):
     geolocation = "geolocation"
@@ -201,6 +213,8 @@ async def location_analytics(
 ):
     ga4_report = fetch_geolocation_events_from_ga4(start_date, end_date)
 
+    print('ga4_report', ga4_report)
+
     geolocation_df = pd.DataFrame([
         {
             'slug': locations_re.match(row['pathname']).group('slug'), 
@@ -208,7 +222,13 @@ async def location_analytics(
             'numGeolocationEvents': row['numGeolocationEvents']
         } for row in ga4_report \
             if locations_re.match(row['pathname']) and row[geolocation_geometry_type.value] is not None
-    ]).set_index('slug')
+    ])
+    if geolocation_df.empty:
+        return {
+            'geolocationLookup': {},
+            'locationDetailsLookup': {}
+        }
+    geolocation_df = geolocation_df.set_index('slug')
     slugs = geolocation_df.index
     with conn.cursor() as cur:
         cur.execute('''
