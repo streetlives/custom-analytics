@@ -4,3 +4,4 @@ wheel
 google-analytics-data
 pandas
 python-dotenv
+google-cloud-bigquery
