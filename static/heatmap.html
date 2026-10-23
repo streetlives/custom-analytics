@@ -74,6 +74,9 @@
 
     let locationsVisible = false;
 
+    // API values carry their own unit: geolocation key events are 'events', page-path totalUsers are 'users'.
+    const unitLabel = unit => unit === 'users' ? 'total users' : unit;
+
     var svg = d3.select("svg"),
       width = +svg.attr("width"),
       height = +svg.attr("height");
@@ -138,7 +141,7 @@
                 .style("opacity", 1)
                 .style("left", (d3.event.pageX) + "px")
                 .style("top", (d3.event.pageY) + "px")
-                .text(`${feature.properties.id} (${metadata['totalUsers']} ${metricType === 'geolocation' ? 'events' : 'total users'})`)
+                .text(`${feature.properties.id} (${metadata.count} ${unitLabel(metadata.unit)})`)
             } else {
               d3.select("#neighborhoodPopover")
                 .transition()
@@ -184,7 +187,7 @@
                 .style("opacity", 1)
                 .style("left", (d3.event.pageX) + "px")
                 .style("top", (d3.event.pageY) + "px")
-                .text(`${locationData.organizationName} (${totalUsersAnalyticsMetadata.totalUsers} ${metricType === 'geolocation' ? 'events' : 'total users'})`)
+                .text(`${locationData.organizationName} (${totalUsersAnalyticsMetadata.count} ${unitLabel(totalUsersAnalyticsMetadata.unit)})`)
             }
           })
           .on("mouseleave", function (d) {
