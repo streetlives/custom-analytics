@@ -6,6 +6,7 @@ import datetime
 import psycopg2
 import os
 from ga4 import fetch_total_users_for_page_path, fetch_geolocation_events_from_ga4
+from metrics import AnalyticsMetricEnum, metric_fields, aggregate_geolocation_events
 import pandas as pd
 from json import loads
 import json
@@ -45,10 +46,6 @@ class GeometryEnum(str, Enum):
     city_council_district_water_areas = 'city_council_district_water_areas'
     election_district = 'election_district'
     election_district_water_areas = 'election_district_water_areas'
-
-class AnalyticsMetricEnum(str, Enum):
-    geolocation = "geolocation"
-    total_users_for_page_path = "totalUsersForPagePath"
 
 app = FastAPI()
 
@@ -301,11 +298,11 @@ async def location_analytics(
     if analytics_metric_type == AnalyticsMetricEnum.geolocation:
         ga4_report = fetch_geolocation_events_from_ga4(start_date, end_date)
         page_path_key = 'pathname'
-        count_of_users_key = 'numGeolocationEvents'
+        count_key = 'numGeolocationEvents'
     elif analytics_metric_type == AnalyticsMetricEnum.total_users_for_page_path:
         ga4_report = fetch_total_users_for_page_path(start_date, end_date)
         page_path_key = 'pagePath'
-        count_of_users_key = 'totalUsers'
+        count_key = 'totalUsers'
 
     slugs = [{
         'slug': x[page_path_key].split('/')[2],
@@ -320,12 +317,12 @@ async def location_analytics(
         ''', (tuple([s['slug'] for s in slugs]),))
         database_df = pd.DataFrame([{'id': id, 'slug': slug, 'position': position, 'organization_name' : organization_name} for id, slug, position, organization_name in cur.fetchall()]).set_index('slug')
         joined_df = slugs_df.join(database_df)
-        total_count_of_users = joined_df[count_of_users_key].max()
+        max_count = joined_df[count_key].max()
         result = { 
             r.name: {
                 'slug': r.name,
-                'totalUsers' : int(r[count_of_users_key]), 
-                'percentage' : total_count_of_users / r[count_of_users_key],
+                **metric_fields(analytics_metric_type, r[count_key]),
+                'percentage' : max_count / r[count_key],
                 'locationId': r['id'], 
                 'organizationName': r['organization_name'],
                 **parse_position(r['position'])
@@ -346,12 +343,11 @@ async def analytics_data(
     if analytics_metric_type == AnalyticsMetricEnum.geolocation:
         # in this case, we don't need to join anything to the database, because the geo information is already embedded in the GA4 event
         ga4_report = fetch_geolocation_events_from_ga4(start_date, end_date)
-        ga4_report_df = pd.DataFrame(ga4_report)
-        df = ga4_report_df[["numGeolocationEvents", geometry_type.value]].set_index(geometry_type.value).groupby(geometry_type.value).sum()
+        df = aggregate_geolocation_events(ga4_report, geometry_type.value)
         total_count_of_events = df['numGeolocationEvents'].max()
         return { 
             r.name if geometry_type == GeometryEnum.neighborhood else int(r.name): {
-                'totalUsers' : int(r['numGeolocationEvents']),
+                **metric_fields(analytics_metric_type, r['numGeolocationEvents']),
                 'percentage' : r['numGeolocationEvents'] / total_count_of_events,
             } for r in df.iloc
         }
@@ -381,7 +377,7 @@ async def analytics_data(
                 print('total_count_of_users ', total_count_of_users )
                 return { 
                     r.name: {
-                        'totalUsers' : int(r['totalUsers']),
+                        **metric_fields(analytics_metric_type, r['totalUsers']),
                         'percentage' : r['totalUsers'] / total_count_of_users,
                     } for r in agg_result.iloc
                 }
@@ -401,7 +397,7 @@ async def analytics_data(
                 total_count_of_users = agg_result['totalUsers'].max()
                 return { 
                     int(r.name): {
-                        'totalUsers' : int(r['totalUsers']),
+                        **metric_fields(analytics_metric_type, r['totalUsers']),
                         'percentage' : r['totalUsers'] / total_count_of_users,
                     } for r in agg_result.iloc 
                 }
